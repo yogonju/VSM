@@ -1,0 +1,25 @@
+menu "rongpin customized drivers"
+
+config RPDZKJ_SYSFS
+	tristate "rpdzkj sysfs  support"
+	default y
+	help
+	  Generic rpdzkj power off 	  
+config RP_ADC
+	tristate "rp_adc driver"
+	default y
+	help
+	  Say yes here to build support for "rp_adc.c".  
+
+config RP_GPIO_CTRL
+	tristate "rp gpio j60 control driver"
+	default y
+	help
+	  Say yes here to build support for "rp_gpio_ctrl.c".
+  
+config RPDZKJ_DEBUG
+        tristate "rpdzkj debug control"
+	default y
+	help
+	  Generic rpdzkj control for debug
+endmenu

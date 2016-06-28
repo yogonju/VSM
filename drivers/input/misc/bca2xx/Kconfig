@@ -1,0 +1,33 @@
+#
+# Miscellaneous I2C chip drivers configuration
+#
+# *** DEPRECATED! Do not add new entries! See Makefile ***
+#
+
+menu "Miscellaneous I2C Chip support"
+
+
+
+config SENSORS_BMA2X2
+	tristate "BMA255/BMA250E/BMA222E/BMA280 acceleration sensor support"
+	depends on I2C=y
+	help
+	  If you say yes here you get support for Bosch Sensortec's 
+	  acceleration sensors BMA255/BMA250E/BMA222E/BMA280.
+config SENSORS_BMA2X2_ENABLE_INT1
+	tristate "BMA2X2 acceleration sensor interrupt INT1 support"
+	depends on SENSORS_BMA2X2=y
+	help
+	  If you say yes here you get INT1 support for Bosch Sensortec's 
+	  acceleration sensors BMA2X2.
+
+config BOSCH_BMA2X2_ENABLE_INT2
+	tristate "BMA2X2 acceleration sensor interrupt INT2 support"
+##	depends on SENSORS_BMA2X2=y
+	depends on BOSCH_BMA2X2=y
+	help
+	  If you say yes here you get INT2 support for Bosch Sensortec's 
+	  acceleration sensors BMA2X2.
+
+endmenu
+
