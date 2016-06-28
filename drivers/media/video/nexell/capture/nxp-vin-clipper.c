@@ -167,6 +167,7 @@ static int _hw_set_clock(struct nxp_vin_clipper *me, bool on)
     int module = parent->get_module_num(parent);
 
     vmsg("%s: module(%d) on(%d)\n", __func__, module, on);
+    printk("## %s: module(%d) on(%d) in clipper.c\n", __func__, module, on);
 
 #ifdef CONFIG_ARCH_NXP4330_3200
     if (on) {
@@ -221,8 +222,8 @@ static int _hw_set_sensor_param(struct nxp_vin_clipper *me)
     int module = parent->get_module_num(parent);
     struct nxp_vin_platformdata *info = me->platdata;
 
-    //vmsg("%s\n", __func__);
-   printk("%s  module : %d \n", __func__,module);
+    vmsg("%s\n", __func__);
+    printk("%s  module : %d in clipper.c\n", __func__,module);
     if (info->is_mipi) {
         vmsg("%s: set mipi param\n", __func__);
         NX_VIP_SetInputPort(module, NX_VIP_INPUTPORT_B);
@@ -276,6 +277,7 @@ static int _hw_set_output_format(struct nxp_vin_clipper *me)
     u32 nx_format;
 
     vmsg("%s\n", __func__);
+    printk("## %s\n in clipper.c", __func__);
 
     if (me->platdata->is_mipi) {
         /* BUGGY !!! */
@@ -318,6 +320,7 @@ static int _hw_set_input_size(struct nxp_vin_clipper *me)
     struct nxp_vin_platformdata *info = me->platdata;
 
     vmsg("%s: w(%d), h(%d)\n", __func__, mbus_fmt->width, mbus_fmt->height);
+    printk("## %s: w(%d), h(%d) in clipper.c\n", __func__, mbus_fmt->width, mbus_fmt->height);
 
     if (me->platdata->is_mipi) {
         vmsg("%s: mipi!!!\n", __func__);
@@ -355,6 +358,7 @@ static int _hw_set_crop(struct nxp_vin_clipper *me)
     struct nxp_vin_platformdata *info = me->platdata;
 
     vmsg("%s: l(%d), t(%d), w(%d), h(%d)\n", __func__, c->left, c->top, c->width, c->height);
+    printk("## %s: l(%d), t(%d), w(%d), h(%d) in clipper.c\n", __func__, c->left, c->top, c->width, c->height);
 
     /*NX_VIP_SetClipRegion(module, c->left, c->top,*/
             /*c->left + c->width, c->top + c->height);*/
@@ -372,6 +376,7 @@ static int _hw_set_addr(struct nxp_vin_clipper *me, struct nxp_video_buffer *buf
 {
     struct nxp_capture *parent = nxp_vin_to_parent(me);
     int module = parent->get_module_num(parent);
+    struct v4l2_rect *c = &me->crop;
 
     vmsg("%s: addr(0x%x)\n", __func__, buf->dma_addr[0]);
 
@@ -381,7 +386,6 @@ static int _hw_set_addr(struct nxp_vin_clipper *me, struct nxp_video_buffer *buf
     _cr_addr = buf->dma_addr[2];
 
     if (me->platdata->is_mipi) {
-        struct v4l2_rect *c = &me->crop;
         vmsg("%s: set mipi vip format(0x%x), width %d, height %d, buf y 0x%x, buf cb 0x%x, buf cr 0x%x, stride 0 %d, stride 1 %d\n",
                 __func__,
                 NX_VIP_FORMAT_422,
@@ -398,9 +402,8 @@ static int _hw_set_addr(struct nxp_vin_clipper *me, struct nxp_video_buffer *buf
             vmsg("%s: clipper bufs 0x%x, stride %d\n",
                 __func__, buf->dma_addr[0], buf->stride[0]);
             /* TODO: how can s5p6818 do this? */
-#if defined(CONFIG_ARCH_S5P4418)
-            NX_VIP_SetClipperAddrYUYV(module, buf->dma_addr[0], buf->stride[0]>>1);
-#endif
+            NX_VIP_SetClipperAddr(module, NX_VIP_FORMAT_YUYV, c->width - c->left, 
+                           c->height - c->top, _lu_addr, _cb_addr, _cr_addr, buf->stride[0], buf->stride[1]);
         } else {
             u32 nx_format = _convert_to_nxp_vip_format(me->format[1].code);
             struct v4l2_rect *c = &me->crop;
@@ -422,6 +425,7 @@ static void _work_power_down(struct work_struct *work)
     struct v4l2_subdev *remote = _get_remote_source_subdev(me);
 
     vmsg("%s\n", __func__);
+    printk("## %s in clipper.c \n", __func__);
     if (remote && me->platdata->power_enable) {
         if (!(NXP_ATOMIC_READ(&me->state) & (NXP_VIN_STATE_RUNNING_DECIMATOR | NXP_VIN_STATE_RUNNING_CLIPPER))) {
             vmsg("power down!!!\n");
@@ -435,6 +439,8 @@ static int _configure(struct nxp_vin_clipper *me, int enable)
     int ret = 0;
     struct v4l2_subdev *remote = _get_remote_source_subdev(me);
 
+    struct v4l2_mbus_framefmt mf;
+
     if (!remote) {
         pr_err("%s: can't find remote source!!!\n", __func__);
         return -EINVAL;
@@ -442,8 +448,8 @@ static int _configure(struct nxp_vin_clipper *me, int enable)
 
     ret = down_interruptible(&me->s_stream_sem);
 
-   // vmsg("%s: enable %d\n", __func__, enable);
-    printk("%s: enable %d\n", __func__, enable);
+    vmsg("%s: enable %d\n", __func__, enable);
+    //printk("%s: enable %d\n", __func__, enable);
     if (enable) {
         if (me->platdata->late_power_down)
             cancel_delayed_work_sync(&me->work_power_down);
@@ -463,11 +469,12 @@ static int _configure(struct nxp_vin_clipper *me, int enable)
 		                v4l2_subdev_call(remote, core, s_power, 0);
 			#else
 				if (me->platdata->power_state_changed()){ 
-		              	  v4l2_subdev_call(remote, core, s_power, 0);
-				 	v4l2_subdev_call(remote,core,init,0); // dxx 
+		            v4l2_subdev_call(remote, core, s_power, 0);
+				 	v4l2_subdev_call(remote, core, init, 0); // dxx 
 				}
 			#endif
         }
+        ret = v4l2_subdev_call(remote, video, g_mbus_fmt, &mf);
         ret = v4l2_subdev_call(remote, video, s_stream, enable);
     } else {
         struct nxp_capture *parent = nxp_vin_to_parent(me);
@@ -487,6 +494,7 @@ static int _configure(struct nxp_vin_clipper *me, int enable)
             NXP_ATOMIC_CLEAR_MASK(NXP_VIN_STATE_STOPPING, &me->state);
     }
     vmsg("%s exit\n", __func__);
+    //printk(KERN_ALERT "%s exit in clipper.c\n", __func__);
 
     up(&me->s_stream_sem);
 
@@ -570,6 +578,7 @@ static int clipper_buffer_queue(struct nxp_video_buffer *buf, void *me)
     struct nxp_vin_clipper *me2 = me;
 
     vmsg("%s: %p\n", __func__, buf);
+    printk("## %s: %p in clipper.c \n", __func__, buf);
     spin_lock_irqsave(&me2->slock, flags);
     list_add_tail(&buf->list, &me2->buffer_list);
     me2->buffer_count++;
@@ -850,6 +859,7 @@ static int nxp_vin_clipper_open(struct v4l2_subdev *sd,
     /* int ret; */
 
     vmsg("%s\n", __func__);
+    printk("## %s in clipper.c \n", __func__);
 
     /* first power on */
 #if 0
@@ -898,6 +908,7 @@ static int nxp_vin_clipper_close(struct v4l2_subdev *sd,
      * called when user app close subdev node
      */
     vmsg("%s\n", __func__);
+    printk("## %s in clipper.c\n", __func__);
 
     /* power off */
 #if 0
@@ -912,6 +923,7 @@ static int nxp_vin_clipper_registered(struct v4l2_subdev *sd)
     struct nxp_vin_clipper *me = v4l2_get_subdevdata(sd);
     NXP_ATOMIC_SET(&me->state, NXP_VIN_STATE_REGISTERED);
     vmsg("%s\n", __func__);
+    printk("## %s in clipper.c\n", __func__);
     return 0;
 }
 
@@ -920,6 +932,7 @@ static void nxp_vin_clipper_unregistered(struct v4l2_subdev *sd)
     struct nxp_vin_clipper *me = v4l2_get_subdevdata(sd);
     NXP_ATOMIC_SET(&me->state, NXP_VIN_STATE_INIT);
     vmsg("%s\n", __func__);
+    printk("## %s in clipper.c\n", __func__);
 }
 
 static const struct v4l2_subdev_internal_ops nxp_vin_clipper_internal_ops = {
@@ -973,6 +986,9 @@ static int nxp_vin_clipper_s_power(struct v4l2_subdev *sd, int on)
         return -EINVAL;
     }
 
+    //printk(KERN_ALERT "## %s, state(0x%x)\n", __func__, state);
+    printk("## %s: %d\n", __func__, on);
+
     if (on) {
         if (me->platdata->setup_io)
             me->platdata->setup_io(module, false);
@@ -983,12 +999,36 @@ static int nxp_vin_clipper_s_power(struct v4l2_subdev *sd, int on)
         ret = v4l2_subdev_call(remote_source, core, s_power, 0);
         _hw_set_clock(me, false);
     }
+    printk("## %s: %d  end here.\n", __func__, on);
 
+    return ret;
+}
+
+static int nxp_vin_clipper_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
+{
+    struct nxp_vin_clipper *me;
+    struct v4l2_subdev *remote_source;
+    int ret = 0;
+
+    me = v4l2_get_subdevdata(sd);
+	if (!me) {
+        pr_err("%s error: me is NULL\n", __func__);
+        return -EINVAL;
+	}
+
+    remote_source = _get_remote_source_subdev(me);
+    if (!remote_source) {
+        pr_err("%s error: remote is NULL\n", __func__);
+        return -EINVAL;
+    }
+
+    ret = v4l2_subdev_call(remote_source, core, s_ctrl, ctrl);
     return ret;
 }
 
 static const struct v4l2_subdev_core_ops nxp_vin_clipper_core_ops = {
     .s_power = nxp_vin_clipper_s_power,
+    .s_ctrl = nxp_vin_clipper_s_ctrl,
 };
 
 /**
@@ -1012,7 +1052,7 @@ static int nxp_vin_clipper_s_stream(struct v4l2_subdev *sd, int enable)
     if (!strncmp(hostname, "VIDEO", 5))
         is_host_video = true;
 
-    //vmsg("%s: state:0x%x, hostname: %s, en:%d\n", __func__, NXP_ATOMIC_READ(&me->state), hostname, enable);
+    vmsg("%s: state:0x%x, hostname: %s, en:%d\n", __func__, NXP_ATOMIC_READ(&me->state), hostname, enable);
     printk("%s: state:0x%x, hostname: %s, en:%d\n", __func__, NXP_ATOMIC_READ(&me->state), hostname, enable);
 
     if (enable) {
@@ -1029,11 +1069,13 @@ static int nxp_vin_clipper_s_stream(struct v4l2_subdev *sd, int enable)
                 }
             }
         }
+
         _configure(me, enable);
         if (is_host_video) {
             ret = _register_irq_handler(me);
             if (ret < 0) {
                 pr_err("%s: failed to _register_irq_handler\n", __func__);
+                printk("%s: failed to _register_irq_handler\n", __func__);
                 return ret;
             }
             _update_next_buffer(me);
@@ -1181,6 +1223,8 @@ static int nxp_vin_clipper_set_fmt(struct v4l2_subdev *sd,
     struct v4l2_mbus_framefmt *__format =
         _get_pad_format(me, fh, format->pad, format->which);
     struct nxp_vin_platformdata *info = me->platdata;
+    struct v4l2_subdev *remote_source;
+    int ret;
     info->h_active = format->format.width;
     info->v_active = format->format.height;
     vmsg("%s: h_active(%d), v_active(%d), code(0x%x)\n", __func__, info->h_active, info->v_active, format->format.code);
@@ -1190,6 +1234,8 @@ static int nxp_vin_clipper_set_fmt(struct v4l2_subdev *sd,
         if (!_find_format(supported_input_formats,
                     ARRAY_SIZE(supported_input_formats), format->format.code)) {
             pr_err("%s: not supported input format(0x%x)\n", __func__,
+                    format->format.code);
+            printk("## %s: not supported input format(0x%x)\n", __func__,
                     format->format.code);
             return -EINVAL;
         }
@@ -1217,7 +1263,15 @@ static int nxp_vin_clipper_set_fmt(struct v4l2_subdev *sd,
         return -EINVAL;
     }
 
+    remote_source = _get_remote_source_subdev(me);
+    ret = v4l2_subdev_call(remote_source, video, s_mbus_fmt, __format);
+    if(ret < 0)
+    {
+        printk("## call s_mbus_fmt failed in %s", __func__);
+    }
+
     vmsg("%s: success!!!\n", __func__);
+    printk("## %s: success!!!\n", __func__);
     return 0;
 }
 
@@ -1286,9 +1340,12 @@ static int nxp_vin_clipper_link_setup(struct media_entity *entity,
     struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(entity);
     struct nxp_vin_clipper *me = v4l2_get_subdevdata(sd);
     struct nxp_capture *parent = nxp_vin_to_parent(me);
+    
+    printk(KERN_ALERT "## %s", __func__);
 
     switch (local->index | media_entity_type(remote->entity)) {
     case NXP_VIN_PAD_SINK | MEDIA_ENT_T_V4L2_SUBDEV:
+        printk("## %s: link sensor to clipper %d, enable %d\n", __func__, local->index, flags & MEDIA_LNK_FL_ENABLED);
         vmsg("%s: link sensor to clipper %d, enable %d\n", __func__, local->index, flags & MEDIA_LNK_FL_ENABLED);
         /* link sensor to me */
         if (!(flags & MEDIA_LNK_FL_ENABLED)) {
@@ -1299,6 +1356,7 @@ static int nxp_vin_clipper_link_setup(struct media_entity *entity,
                 _handle_input_connection(me, false);
                 break;
             } else {
+                printk("## %s: invalid disconnect input\n", __func__);
                 pr_err("%s: invalid disconnect input\n", __func__);
                 return -EINVAL;
             }
@@ -1319,10 +1377,12 @@ static int nxp_vin_clipper_link_setup(struct media_entity *entity,
 
         vmsg("%s: connect clipper to sensor\n", __func__);
         _handle_input_connection(me, true);
+        printk("## connected clipper to sensor\n");
         break;
 
     case NXP_VIN_PAD_SOURCE_MEM | MEDIA_ENT_T_DEVNODE:
         vmsg("%s: link video to clipper %d, enable %d\n", __func__, local->index, flags & MEDIA_LNK_FL_ENABLED);
+        printk("## %s: link video to clipper %d, enable %d\n", __func__, local->index, flags & MEDIA_LNK_FL_ENABLED);
         if (!(flags & MEDIA_LNK_FL_ENABLED)) {
             /* disconnect video device */
             if (NXP_ATOMIC_READ(&me->state) & NXP_VIN_STATE_OUTPUT_CONNECTED &&
@@ -1352,10 +1412,12 @@ static int nxp_vin_clipper_link_setup(struct media_entity *entity,
 
         _handle_video_connection(me, true);
         me->link_count++;
+        printk("## connected video to clipper\n");
         break;
 
     case NXP_VIN_PAD_SOURCE_DECIMATOR | MEDIA_ENT_T_V4L2_SUBDEV:
         vmsg("%s: link decimator to clipper %d, enable %d\n", __func__, local->index, flags & MEDIA_LNK_FL_ENABLED);
+        printk("## %s: link decimator to clipper %d, enable %d\n", __func__, local->index, flags & MEDIA_LNK_FL_ENABLED);
         if (!(flags & MEDIA_LNK_FL_ENABLED)) {
             /* disconnect decimator device */
             if (NXP_ATOMIC_READ(&me->state) & NXP_VIN_STATE_OUTPUT_CONNECTED &&
@@ -1385,6 +1447,7 @@ static int nxp_vin_clipper_link_setup(struct media_entity *entity,
 
         _handle_decimator_connection(me, true);
         me->link_count++;
+        printk("## connected decimator to clipper.\n");
         break;
 
     case NXP_VIN_PAD_SOURCE_MEM | MEDIA_ENT_T_V4L2_SUBDEV:
@@ -1438,9 +1501,12 @@ static int _init_entities(struct nxp_vin_clipper *me)
     pads[NXP_VIN_PAD_SOURCE_DECIMATOR].flags = MEDIA_PAD_FL_SOURCE;
 
     entity->ops = &nxp_vin_clipper_media_ops;
+    
+    printk(KERN_ALERT "## %s: media_entity_init()\n", __func__);
     ret = media_entity_init(entity, NXP_VIN_PAD_MAX, pads, 0);
     if (ret < 0) {
-        pr_err("%s: failed to media_entity_init()\n", __func__);
+        printk(KERN_ALERT "## %s: failed to media_entity_init()\n", __func__);
+        //pr_err("%s: failed to media_entity_init()\n", __func__);
         return ret;
     }
 
@@ -1463,10 +1529,11 @@ static int _init_entities(struct nxp_vin_clipper *me)
     ret = media_entity_create_link(entity, NXP_VIN_PAD_SOURCE_MEM,
             &me->video->vdev.entity, 0, 0);
     if (ret < 0) {
-        pr_err("%s: failed to media_entity_create_link()\n", __func__);
+        printk(KERN_ALERT "## fail to link vin clipper");
+        //pr_err("%s: failed to media_entity_create_link()\n", __func__);
         goto error_link;
     }
-
+    
     return 0;
 
 error_link:
@@ -1502,6 +1569,7 @@ int nxp_vin_clipper_init(struct nxp_vin_clipper *me,
     }
 
     vmsg("%s: ret(%d)\n", __func__, ret);
+    printk("## %s: ret(%d) in clipper.c \n", __func__, ret);
     return ret;
 }
 

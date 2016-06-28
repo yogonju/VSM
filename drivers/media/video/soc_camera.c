@@ -1036,7 +1036,7 @@ static int soc_camera_probe(struct soc_camera_device *icd)
 	int ret;
 
 	dev_info(icd->pdev, "Probing %s\n", dev_name(icd->pdev));
-
+    printk("## \n ## \n ## %s", __func__);
 	/*
 	 * Currently the subdev with the largest number of controls (13) is
 	 * ov6550. So let's pick 16 as a hint for the control handler. Note
@@ -1463,6 +1463,7 @@ static int __devinit soc_camera_pdrv_probe(struct platform_device *pdev)
 	struct soc_camera_link *icl = pdev->dev.platform_data;
 	struct soc_camera_device *icd;
 	int ret;
+    printk("##---------------- soc camera init");
 
 	if (!icl)
 		return -EINVAL;
@@ -1483,6 +1484,7 @@ static int __devinit soc_camera_pdrv_probe(struct platform_device *pdev)
 	icd->user_width		= DEFAULT_WIDTH;
 	icd->user_height	= DEFAULT_HEIGHT;
 
+    printk("##---------- soc_camera_init success");
 	return 0;
 
 escdevreg:

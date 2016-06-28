@@ -243,6 +243,8 @@ static int __vb2_queue_alloc(struct vb2_queue *q, enum v4l2_memory memory,
 
 	dprintk(1, "Allocated %d buffers, %d plane(s) each\n",
 			buffer, num_planes);
+	printk("## Allocated %d buffers, %d plane(s) each\n",
+			buffer, num_planes);
 
 	return buffer;
 }
@@ -544,8 +546,11 @@ int vb2_reqbufs(struct vb2_queue *q, struct v4l2_requestbuffers *req)
 	unsigned int num_buffers, allocated_buffers, num_planes = 0;
 	int ret = 0;
 
+    printk(KERN_ALERT "##  %s line %d \n", __func__, __LINE__);
+
 	if (q->fileio) {
 		dprintk(1, "reqbufs: file io in progress\n");
+		printk(KERN_ALERT "## reqbufs: file io in progress\n");
 		return -EBUSY;
 	}
 
@@ -553,20 +558,25 @@ int vb2_reqbufs(struct vb2_queue *q, struct v4l2_requestbuffers *req)
 	    req->memory != V4L2_MEMORY_DMABUF &&
 	    req->memory != V4L2_MEMORY_USERPTR) {
 		dprintk(1, "reqbufs: unsupported memory type\n");
+		printk(KERN_ALERT "## reqbufs: unsupported memory type\n");
 		return -EINVAL;
 	}
 
 	if (req->type != q->type) {
 		dprintk(1, "reqbufs: requested type is incorrect\n");
+		printk(KERN_ALERT "## reqbufs: requested type is incorrect\n");
 		return -EINVAL;
 	}
 
 	if (q->streaming) {
 		dprintk(1, "reqbufs: streaming active\n");
+		printk(KERN_ALERT "## reqbufs: streaming active\n");
 		return -EBUSY;
 	}
 
-	/*
+    printk(KERN_ALERT "##  %s line %d \n", __func__, __LINE__);
+	
+    /*
 	 * Make sure all the required memory ops for given memory type
 	 * are available.
 	 */
@@ -577,13 +587,17 @@ int vb2_reqbufs(struct vb2_queue *q, struct v4l2_requestbuffers *req)
 
 	if (req->memory == V4L2_MEMORY_USERPTR && __verify_userptr_ops(q)) {
 		dprintk(1, "reqbufs: USERPTR for current setup unsupported\n");
+		printk("## reqbufs: USERPTR for current setup unsupported\n");
 		return -EINVAL;
 	}
 
 	if (req->memory == V4L2_MEMORY_DMABUF && __verify_dmabuf_ops(q)) {
 		dprintk(1, "reqbufs: DMABUF for current setup unsupported\n");
+		printk("## reqbufs: DMABUF for current setup unsupported\n");
 		return -EINVAL;
 	}
+
+    printk("##  %s line %d \n", __func__, __LINE__);
 
 	if (req->count == 0 || q->num_buffers != 0 || q->memory != req->memory) {
 		/*
@@ -591,7 +605,8 @@ int vb2_reqbufs(struct vb2_queue *q, struct v4l2_requestbuffers *req)
 		 * are not in use and can be freed.
 		 */
 		if (q->memory == V4L2_MEMORY_MMAP && __buffers_in_use(q)) {
-			dprintk(1, "reqbufs: memory in use, cannot free\n");
+            dprintk(1, "reqbufs: memory in use, cannot free\n");
+			printk("## reqbufs: memory in use, cannot free\n");
 			return -EBUSY;
 		}
 
@@ -622,10 +637,14 @@ int vb2_reqbufs(struct vb2_queue *q, struct v4l2_requestbuffers *req)
 	if (ret)
 		return ret;
 
+
+    printk("##  %s line %d \n", __func__, __LINE__);
+
 	/* Finally, allocate buffers and video memory */
 	ret = __vb2_queue_alloc(q, req->memory, num_buffers, num_planes);
 	if (ret == 0) {
 		dprintk(1, "Memory allocation failed\n");
+		printk("## Memory allocation failed\n");
 		return -ENOMEM;
 	}
 
@@ -662,6 +681,7 @@ int vb2_reqbufs(struct vb2_queue *q, struct v4l2_requestbuffers *req)
 	 */
 	req->count = allocated_buffers;
 
+    printk("##  %s line %d \n", __func__, __LINE__);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(vb2_reqbufs);

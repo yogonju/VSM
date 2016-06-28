@@ -1,7 +1,6 @@
 *.cmd
 *.symvers
 *.o
-.config
 .config.old
 .missing-syscalls.d
 .tmp*

@@ -1,4 +1,4 @@
-/*#define DEBUG 0*/
+#define DEBUG 1
 
 #include <linux/kernel.h>
 #include <linux/list.h>
@@ -569,6 +569,7 @@ static void *_get_alloc_ctx(struct nxp_capture *me)
 static int _run(struct nxp_capture *me, void *child)
 {
     vmsg("%s: %p\n", __func__, child);
+    printk("## %s: %p\n", __func__, child);
     if (&me->vin_clipper == child)
         NXP_ATOMIC_SET_MASK(CAPTURE_CHILD_CLIPPER, &me->running_child_bitmap);
     else if (&me->decimator == child)
@@ -686,6 +687,7 @@ void nxp_v4l2_capture_set_sensor_subdev(struct v4l2_subdev *sd)
 static struct v4l2_subdev *_register_sensor(struct nxp_capture *me,
         struct nxp_v4l2_i2c_board_info *board_info)
 {
+    struct media_link *link = NULL;
     struct v4l2_subdev *sensor = NULL;
     struct i2c_adapter *adapter;
     struct media_entity *input;
@@ -706,8 +708,10 @@ static struct v4l2_subdev *_register_sensor(struct nxp_capture *me,
             return NULL;
         }
 
+        //printk(KERN_ALERT "##v4l2_i2c_new_subdev begins\n");
         sensor = v4l2_i2c_new_subdev_board(me->get_v4l2_device(me),
                 adapter, board_info->board_info, NULL);
+        //printk(KERN_ALERT "##v4l2_i2c_new_subdev ends\n");
         if (!sensor) {
             pr_err("%s: unable to register subdev %s\n",
                     __func__, board_info->board_info->type);
@@ -738,7 +742,8 @@ static struct v4l2_subdev *_register_sensor(struct nxp_capture *me,
     ret = media_entity_create_link(&sensor->entity, 0,
             input, pad, flags);
     if (ret < 0) {
-        pr_err("%s: failed to media_entity_create_link()\n", __func__);
+        //pr_err("%s: failed to media_entity_create_link()\n", __func__);
+        printk("### %s: failed to media_entity_create_link()\n", __func__);
         return NULL;
     }
 
@@ -751,7 +756,13 @@ static struct v4l2_subdev *_register_sensor(struct nxp_capture *me,
 	}
 
     sensor_index++;
-
+    
+    link = media_entity_find_link(sensor->entity.pads, &input->pads[NXP_VIN_PAD_SINK]);
+    if (NULL != link)
+        printk(KERN_ALERT "## media_entity_find_link success\n");
+    ret = media_entity_setup_link(link, MEDIA_LNK_FL_ENABLED);
+    printk(KERN_ALERT "## return %d from media_entity_setup_link\n", ret);
+    
     return sensor;
 }
 
@@ -791,12 +802,14 @@ static int create_sensor_sysfs(int module)
     if (!sysfs_created) {
         struct kobject *kobj = kobject_create_and_add("camera sensor", &platform_bus.kobj);
         if (!kobj) {
+            printk("%s: failed to kobject_create_and_add for camera sensor\n", __func__);
             pr_err("%s: failed to kobject_create_and_add for camera sensor\n", __func__);
             return -EINVAL;
         }
 
         ret = sysfs_create_group(kobj, &attr_group);
         if (ret) {
+            printk("%s: failed to sysfs_create_group for camera sensor\n", __func__);
             pr_err("%s: failed to sysfs_create_group for camera sensor\n", __func__);
             kobject_del(kobj);
             return -EINVAL;
@@ -875,8 +888,10 @@ struct nxp_capture *create_nxp_capture(int index,
 #endif
 
     ret = nxp_vin_clipper_init(&me->vin_clipper, &pdata->parallel);
+    printk(KERN_ALERT "##%s: nxp_vin_clipper_init()\n", __func__);
     if (ret < 0) {
-        pr_err("%s: failed to nxp_vin_clipper_init()\n", __func__);
+        //pr_err("%s: failed to nxp_vin_clipper_init()\n", __func__);
+        printk(KERN_ALERT "##%s: failed to nxp_vin_clipper_init()\n", __func__);
         goto error_vin;
     }
 
@@ -893,7 +908,7 @@ struct nxp_capture *create_nxp_capture(int index,
     if (csi_enabled) {
         ret = media_entity_create_link(
                 &me->csi.subdev.entity, NXP_CSI_PAD_SOURCE,
-                &me->vin_clipper.subdev.entity, NXP_VIN_PAD_SINK, 0);
+                &me->vin_clipper.subdev.entity, NXP_VIN_PAD_SINK, MEDIA_LNK_FL_IMMUTABLE);
         if (ret < 0) {
             pr_err("%s: failed to link csi source to vin sink\n", __func__);
             goto error_link;
@@ -913,6 +928,8 @@ struct nxp_capture *create_nxp_capture(int index,
         pr_err("%s: failed to link vin source to decimator sink\n", __func__);
         goto error_link;
     }
+    
+
 #endif
 
     /*
@@ -934,7 +951,10 @@ error_csi:
     nxp_decimator_cleanup(&me->decimator);
 error_decimator:
 #endif
+
+#ifdef CONFIG_NXP_CAPTURE_CLIPPER
     nxp_vin_clipper_cleanup(&me->vin_clipper);
+#endif
 error_vin:
     kfree(me);
     return NULL;
@@ -950,13 +970,15 @@ void release_nxp_capture(struct nxp_capture *me)
 #ifdef CONFIG_NXP_CAPTURE_DECIMATOR
     nxp_decimator_cleanup(&me->decimator);
 #endif
+#ifdef CONFIG_NXP_CAPTURE_CLIPPER
     nxp_vin_clipper_cleanup(&me->vin_clipper);
-
+#endif
     kfree(me);
 }
 
 int register_nxp_capture(struct nxp_capture *me)
 {
+    struct media_link *link = NULL;
     int ret;
     struct nxp_v4l2_i2c_board_info *sensor_info;
     struct v4l2_subdev *sensor;
@@ -976,11 +998,13 @@ int register_nxp_capture(struct nxp_capture *me)
     }
 #endif
 
+#ifdef CONFIG_NXP_CAPTURE_CLIPPER
     ret = nxp_vin_clipper_register(&me->vin_clipper);
     if (ret < 0) {
         pr_err("%s: failed to nxp_vin_clipper_register()\n", __func__);
         goto error_vin;
     }
+#endif
 
 #ifdef CONFIG_NXP_CAPTURE_DECIMATOR
     ret = nxp_decimator_register(&me->decimator);
@@ -991,24 +1015,50 @@ int register_nxp_capture(struct nxp_capture *me)
 #endif
 
     /* find sensor subdev */
+    
+    sensor = _register_sensor(me, me->platdata->sensor);
+    printk(KERN_ALERT"### sensor subdev registration \n");
+    if (NULL == sensor) {
+        pr_err("%s: can't register sensor subdev\n", __func__);
+        goto error_sensor;
+    }
+    
+    me->sensor = sensor;
+    
+    link = media_entity_find_link(
+            &me->vin_clipper.subdev.entity.pads[NXP_VIN_PAD_SOURCE_DECIMATOR],
+            &me->decimator.subdev.entity.pads[NXP_DECIMATOR_PAD_SINK]);
+    if (NULL == link)
+        printk(KERN_ALERT "## fail to find link from clipper to decimator.\n");
+    ret = media_entity_setup_link(link, MEDIA_LNK_FL_ENABLED);
+    if (ret != 0)
+        printk(KERN_ALERT "## fail to setup link from clipper to decimator.\n");
+    
+    link = media_entity_find_link(
+            &(me->vin_clipper.subdev.entity.pads[NXP_VIN_PAD_SOURCE_MEM]),
+            me->vin_clipper.video->pads);
+    if (NULL == link)
+        printk(KERN_ALERT "## fail to find link from clipper to video node.\n");
+    ret = media_entity_setup_link(link, MEDIA_LNK_FL_ENABLED);
+    if (ret != 0)
+        printk(KERN_ALERT "## fail to setup link from clipper to video node.\n");
+    
+    link = media_entity_find_link(
+            &(me->decimator.subdev.entity.pads[NXP_DECIMATOR_PAD_SOURCE_MEM]),
+            me->decimator.video->pads);
+    if (NULL == link)
+        printk(KERN_ALERT "## fail to find link from decimator to video node.\n");
+    ret = media_entity_setup_link(link, MEDIA_LNK_FL_ENABLED);
+    if (ret != 0)
+        printk(KERN_ALERT "## fail to setup link from decimator to video node.\n");
 #if 0
-    sensor_info = me->platdata->sensor;
-    if (!sensor_info) {
-        pr_err("%s: can't find sensor platdata\n", __func__);
-        goto error_sensor;
-    }
-
-    sensor = _register_sensor(me, sensor_info);
-    if (!sensor) {
-        pr_err("%s: can't register sensor subdev\n", __func__);
-        goto error_sensor;
-    }
-#else
-    if (NULL == _register_sensor(me, me->platdata->sensor)) {
-        pr_err("%s: can't register sensor subdev\n", __func__);
-        goto error_sensor;
-    }
+    struct v4l2_device *vdev;
+    vdev = me->get_v4l2_device(me);
+    // There are 11 control ops in OV5640
+    v4l2_ctrl_handler_init(&vdev->ctrl_handler, 11);
+	v4l2_ctrl_add_handler(&vdev->ctrl_handler, sensor->ctrl_handler);
 #endif
+
 
     // psw0523 fix for urbetter
     /* ret = request_irq(me->irq, &_irq_handler, IRQF_DISABLED, "nxp-capture", me); */
@@ -1028,7 +1078,11 @@ error_sensor:
     nxp_decimator_unregister(&me->decimator);
 error_decimator:
 #endif
+
+#ifdef CONFIG_NXP_CAPTURE_CLIPPER
     nxp_vin_clipper_unregister(&me->vin_clipper);
+#endif
+
 error_vin:
 #ifdef CONFIG_NXP_CAPTURE_MIPI_CSI
     if (csi_enabled)
@@ -1045,7 +1099,11 @@ void unregister_nxp_capture(struct nxp_capture *me)
 #ifdef CONFIG_NXP_CAPTURE_DECIMATOR
     nxp_decimator_unregister(&me->decimator);
 #endif
+
+#ifdef CONFIG_NXP_CAPTURE_CLIPPER
     nxp_vin_clipper_unregister(&me->vin_clipper);
+#endif
+
 #ifdef CONFIG_NXP_CAPTURE_MIPI_CSI
     if (me->interface_type == NXP_CAPTURE_INF_CSI)
         nxp_csi_unregister(&me->csi);
@@ -1064,11 +1122,13 @@ int suspend_nxp_capture(struct nxp_capture *me)
         return ret;
     }
 #endif
+#ifdef CONFIG_NXP_CAPTURE_CLIPPER
     ret = nxp_vin_clipper_suspend(&me->vin_clipper);
     if (ret) {
         PM_DBGOUT("%s: failed to nxp_vin_clipper_suspend() ret %d\n", __func__, ret);
         return ret;
     }
+#endif
 #ifdef CONFIG_NXP_CAPTURE_MIPI_CSI
     if (me->interface_type == NXP_CAPTURE_INF_CSI) {
         ret = nxp_csi_suspend(&me->csi);
@@ -1087,7 +1147,9 @@ int resume_nxp_capture(struct nxp_capture *me)
 {
     PM_DBGOUT("+%s\n", __func__);
 
+#ifdef CONFIG_NXP_CAPTURE_CLIPPER
     nxp_vin_clipper_resume(&me->vin_clipper);
+#endif
 
 #ifdef CONFIG_NXP_CAPTURE_DECIMATOR
     nxp_decimator_resume(&me->decimator);

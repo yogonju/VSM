@@ -174,11 +174,14 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 	struct ion_buffer *buffer;
 	struct sg_table *table;
 	struct scatterlist *sg;
-	int i, ret;
+    int i, ret;
 
-	buffer = kzalloc(sizeof(struct ion_buffer), GFP_KERNEL);
+    buffer = kzalloc(sizeof(struct ion_buffer), GFP_KERNEL);
 	if (!buffer)
+    {
+        printk("## %s : kzalloc error.\n", __func__);
 		return ERR_PTR(-ENOMEM);
+    }
 
 	buffer->heap = heap;
 	buffer->flags = flags;
@@ -186,15 +189,22 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 
 	ret = heap->ops->allocate(heap, buffer, len, align, flags);
 
-	if (ret) {
+	if (ret)
+    {
+        printk("## %s : allocate error.\n", __func__);
 		if (!(heap->flags & ION_HEAP_FLAG_DEFER_FREE))
+        {
+            printk("## %s : ION_HEAP_FLAG error\n", __func__);
 			goto err2;
-
+        }
 		ion_heap_freelist_drain(heap, 0);
 		ret = heap->ops->allocate(heap, buffer, len, align,
 					  flags);
 		if (ret)
+        {
+            printk("## %s : freelist heap allocate error.\n", __func__);
 			goto err2;
+        }
 	}
 
 	buffer->dev = dev;
@@ -209,13 +219,17 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 		return ERR_PTR(PTR_ERR(table));
 	}
 	buffer->sg_table = table;
+
+
 	if (ion_buffer_fault_user_mappings(buffer)) {
 		int num_pages = PAGE_ALIGN(buffer->size) / PAGE_SIZE;
 		struct scatterlist *sg;
 		int i, j, k = 0;
 
 		buffer->pages = vmalloc(sizeof(struct page *) * num_pages);
-		if (!buffer->pages) {
+		if (!buffer->pages)
+        {
+            printk("## %s : vmalloc error.\n", __func__);
 			ret = -ENOMEM;
 			goto err1;
 		}
@@ -230,6 +244,8 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 		if (ret)
 			goto err;
 	}
+
+    printk("## func %s line %d\n", __func__, __LINE__);
 
 	buffer->dev = dev;
 	buffer->size = len;
@@ -248,6 +264,8 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 	mutex_lock(&dev->buffer_lock);
 	ion_buffer_add(dev, buffer);
 	mutex_unlock(&dev->buffer_lock);
+
+    printk("## func %s line %d\n", __func__, __LINE__);
 	return buffer;
 
 err:
@@ -459,18 +477,27 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 	struct ion_heap *heap;
 	int ret;
 
-	pr_debug("%s: len %d align %d heap_id_mask %u flags %x\n", __func__,
+    flags = ION_HEAP_TYPE_CARVEOUT; //ION_HEAP_TYPE_SYSTEM_CONTIG;
+    heap_id_mask = flags;
+	
+    pr_debug("%s: len %d align %d heap_id_mask %u flags %x\n", __func__,
 		 len, align, heap_id_mask, flags);
-	/*
+	
+    /*
 	 * traverse the list of heaps available in this system in priority
 	 * order.  If the heap type is supported by the client, and matches the
 	 * request of the caller allocate from it.  Repeat until allocate has
 	 * succeeded or all heaps have been tried
 	 */
 	if (WARN_ON(!len))
+    {
+        printk("## %s:, len error", __func__);
 		return ERR_PTR(-EINVAL);
-
+    }
 	len = PAGE_ALIGN(len);
+	
+    printk("## %s: len %d align %d heap_id_mask %u flags %x\n", __func__,
+		 len, align, heap_id_mask, flags);
 
 	down_read(&dev->lock);
 	plist_for_each_entry(heap, &dev->heaps, node) {
@@ -484,11 +511,16 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 	up_read(&dev->lock);
 
 	if (buffer == NULL)
+    {
+        printk("##%s: buffer == NULL\n", __func__);
 		return ERR_PTR(-ENODEV);
+    }
 
 	if (IS_ERR(buffer))
+    {
+        printk("##%s: buffer error", __func__);
 		return ERR_PTR(PTR_ERR(buffer));
-
+    }
 	handle = ion_handle_create(client, buffer);
 
 	/*
@@ -498,11 +530,17 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 	ion_buffer_put(buffer);
 
 	if (IS_ERR(handle))
+    {
+        printk("##%s: handle error", __func__);
 		return handle;
+    }
 
 	mutex_lock(&client->lock);
 	ret = ion_handle_add(client, handle);
-	if (ret) {
+	
+    if (ret)
+    {
+        printk("##%s: ion_handle_add() error", __func__);
 		ion_handle_put(handle);
 		handle = ERR_PTR(ret);
 	}
@@ -510,6 +548,7 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 
 	return handle;
 }
+
 EXPORT_SYMBOL(ion_alloc);
 
 void ion_free(struct ion_client *client, struct ion_handle *handle)

@@ -462,6 +462,7 @@ static int nxp_decimator_s_power(struct v4l2_subdev *sd, int on)
     struct v4l2_subdev *remote_source;
 
     vmsg("%s: %d\n", __func__, on);
+    printk("## %s: %d in decimator.c\n", __func__, on);
 
     me = v4l2_get_subdevdata(sd);
     if (!me) {
@@ -550,6 +551,7 @@ static int nxp_decimator_s_stream(struct v4l2_subdev *sd, int enable)
     void *hostdata_back;
 
     vmsg("%s: %d\n", __func__, enable);
+    printk("## %s: %d in decimator.c \n", __func__, enable);
 
 #ifdef CONFIG_ARCH_NXP4330_3200
     if (enable) {
@@ -872,7 +874,7 @@ static int _init_entities(struct nxp_decimator *me)
         pr_err("%s: failed to media_entity_create_link()\n", __func__);
         goto error_link;
     }
-
+    
     return 0;
 
 error_link:

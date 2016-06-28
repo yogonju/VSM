@@ -324,8 +324,10 @@ _get_remote_subdev(struct nxp_video *me, u32 type, u32 *pad)
 
     if (!remote ||
         media_entity_type(remote->entity) != MEDIA_ENT_T_V4L2_SUBDEV)
+    {
+        printk("fail to get_remote_subdev entity_type = %d", media_entity_type(remote->entity));
         return NULL;
-
+    }
     if (pad)
         *pad = remote->index;
 
@@ -341,19 +343,27 @@ _fill_nxp_video_buffer(struct nxp_video_buffer *buf, struct vb2_buffer *vb)
     struct nxp_video_frame *frame;
     bool is_separated;
 
-    if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE)
+    if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE)
         frame = &me->frame[0];
     else
         frame = &me->frame[1];
 
     is_separated = frame->format.is_separated;
-    for (i = 0; i < frame->format.num_sw_planes; i++) {
+    for (i = 0; i < frame->format.num_sw_planes; i++)
+    {
         if (i == 0 || is_separated)
+        {
             buf->dma_addr[i] = plane_addr(vb, i);
+        }
         else
+        {
             buf->dma_addr[i] = buf->dma_addr[i-1] + frame->size[i-1];
+        }
+
         buf->stride[i] = frame->stride[i];
         pr_debug("[BUF plane %d] addr(0x%x), s(%d)\n",
+                i, buf->dma_addr[i], buf->stride[i]);
+        printk("## [BUF plane %d] addr(0x%x), s(%d)\n",
                 i, buf->dma_addr[i], buf->stride[i]);
     }
 
@@ -381,6 +391,8 @@ _find_consumer(struct nxp_video *me, struct list_head *head, int index)
     }
     spin_unlock_irqrestore(&me->lock_consumer, flags);
 
+    printk("## %s succeed", __func__);
+
     return c;
 }
 
@@ -396,7 +408,7 @@ static int buffer_done(struct nxp_video_buffer *buf)
     u32 ci = buf->consumer_index;
     u32 type = vb->vb2_queue->type;
 
-    if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
+    if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
         consumer_count = me->sink_consumer_count;
         cl = &me->sink_consumer_list;
     } else {
@@ -405,6 +417,8 @@ static int buffer_done(struct nxp_video_buffer *buf)
     }
 
     pr_debug("%s: type(0x%x), ci(%d), count(%d)\n",
+             __func__, type, ci, consumer_count);
+    printk("## %s: type(0x%x), ci(%d), count(%d)\n",
              __func__, type, ci, consumer_count);
 
     if (ci >= consumer_count) {
@@ -437,8 +451,9 @@ static int nxp_vb2_queue_setup(struct vb2_queue *q, const struct v4l2_format *fm
     struct nxp_video_frame *frame = NULL;
 
     pr_debug("%s\n", __func__);
+    printk("%s\n", __func__);
 
-    if (q->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE)
+    if (q->type == V4L2_BUF_TYPE_VIDEO_CAPTURE)
         frame = &me->frame[0];
     else
         frame = &me->frame[1];
@@ -456,7 +471,8 @@ static int nxp_vb2_queue_setup(struct vb2_queue *q, const struct v4l2_format *fm
 
     *num_planes = (unsigned int)(frame->format.num_planes);
 
-    for (i = 0; i < *num_planes; ++i) {
+    for (i = 0; i < *num_planes; ++i)
+    {
         alloc_ctxs[i] = me->vb2_alloc_ctx;
     }
 
@@ -485,20 +501,28 @@ static int nxp_vb2_buf_init(struct vb2_buffer *vb)
     u32 type = vb->vb2_queue->type;
 
     pr_debug("%s: type(0x%x)\n", __func__, type);
+    printk("%s: type(0x%x)\n", __func__, type);
 
-    if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
+    if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE)
+    {
         bufs = me->sink_bufs;
-    } else if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
+    }
+    else if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
+    {
         bufs = me->source_bufs;
-    } else {
+    }
+    else
+    {
         pr_err("%s: invalid buffer type(0x%x)\n", __func__, type);
         return -EINVAL;
     }
 
-    if (!bufs[index]) {
+    if (!bufs[index])
+    {
         buf = kzalloc(sizeof(*buf), GFP_KERNEL);
         if (!buf) {
             pr_err("%s: failed to allocat nxp_video_buffer\n", __func__);
+            printk("%s: failed to allocat nxp_video_buffer\n", __func__);
             return -ENOMEM;
         }
         buf->priv        = vb;
@@ -519,7 +543,7 @@ static void nxp_vb2_buf_cleanup(struct vb2_buffer *vb)
 
     pr_debug("%s\n", __func__);
 
-    if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
+    if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
         bufs = me->sink_bufs;
     } else if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
         bufs = me->source_bufs;
@@ -560,6 +584,7 @@ static int nxp_vb2_stop_streaming(struct vb2_queue *q)
     return 0;
 }
 
+// called from qbuf
 /* real queue!!! */
 static void nxp_vb2_buf_queue(struct vb2_buffer *vb)
 {
@@ -569,7 +594,7 @@ static void nxp_vb2_buf_queue(struct vb2_buffer *vb)
     u32 type = vb->vb2_queue->type;
     int ret;
 
-    if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
+    if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
         buf = me->sink_bufs[vb->v4l2_buf.index];
         c = _find_consumer(me, &me->sink_consumer_list, 0);
     } else if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
@@ -577,22 +602,27 @@ static void nxp_vb2_buf_queue(struct vb2_buffer *vb)
         c = _find_consumer(me, &me->source_consumer_list, 0);
     } else {
         pr_err("%s: invalid buffer type(0x%x)\n", __func__, type);
+        printk("%s: invalid buffer type(0x%x)\n", __func__, type);
         return;
     }
 
     if (!buf || !c) {
         pr_err("%s: No consumer or No buf!!!\n", __func__);
+        printk("%s: No consumer or No buf!!!\n", __func__);
         return;
     }
 
     ret = _fill_nxp_video_buffer(buf, vb);
-    if (ret < 0) {
+    if (ret < 0)
+    {
         pr_err("%s: fatal error!!!\n", __func__);
+        printk("%s: fatal error!!!\n", __func__);
         vb2_buffer_done(vb, VB2_BUF_STATE_ERROR);
         return;
     }
 
     pr_debug("%s buf(%p)\n", __func__, buf);
+    printk("%s buf(%p)\n", __func__, buf);
     c->queue(buf, c->priv);
 
     /* for m2m : TODO */
@@ -641,7 +671,7 @@ static int m2m_queue_init(void *priv, struct vb2_queue *src_vq,
 
     memset(dst_vq, 0, sizeof(*dst_vq));
     dst_vq->name = kasprintf(GFP_KERNEL, "%s-dst", me->name);
-    dst_vq->type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+    dst_vq->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     dst_vq->io_modes = VB2_MMAP | VB2_USERPTR | VB2_DMABUF;
     dst_vq->drv_priv = me;
     dst_vq->ops = &nxp_vb2_ops;
@@ -707,6 +737,10 @@ static struct v4l2_m2m_ops nxp_m2m_ops = {
  * v4l2_ioctl_ops
  */
 /* querycap: check capture, out, m2m */
+
+#define V4L2_CAP_EXT_PIX_FORMAT 0x00200000  
+//The device supports the struct v4l2_pix_format extended fields.
+
 static int nxp_video_querycap(struct file *file, void *fh,
         struct v4l2_capability *cap)
 {
@@ -714,20 +748,21 @@ static int nxp_video_querycap(struct file *file, void *fh,
 
     strlcpy(cap->driver, me->name, sizeof(cap->driver));
     strlcpy(cap->card, me->vdev.name, sizeof(cap->card));
-    strlcpy(cap->bus_info, "media", sizeof(cap->bus_info));
-    cap->version = KERNEL_VERSION(1, 0, 0);
+    strlcpy(cap->bus_info, "I2C: media", sizeof(cap->bus_info));
+    cap->version = KERNEL_VERSION(4, 0, 0);
 
     pr_debug("%s: devname(%s)\n", __func__, cap->driver);
 
     switch(me->type) {
     case NXP_VIDEO_TYPE_CAPTURE:
-        cap->capabilities = V4L2_CAP_VIDEO_CAPTURE_MPLANE | V4L2_CAP_STREAMING;
+        cap->capabilities = V4L2_CAP_VIDEO_CAPTURE_MPLANE | V4L2_CAP_STREAMING |
+                V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_READWRITE;
         break;
     case NXP_VIDEO_TYPE_OUT:
         cap->capabilities = V4L2_CAP_VIDEO_OUTPUT_MPLANE | V4L2_CAP_STREAMING;
         break;
     case NXP_VIDEO_TYPE_M2M:
-        cap->capabilities = V4L2_CAP_VIDEO_CAPTURE_MPLANE |
+        cap->capabilities = V4L2_CAP_VIDEO_CAPTURE |
             V4L2_CAP_VIDEO_OUTPUT_MPLANE | V4L2_CAP_STREAMING;
         break;
     default:
@@ -737,6 +772,7 @@ static int nxp_video_querycap(struct file *file, void *fh,
 
     return 0;
 }
+
 
 static int nxp_video_enum_format(struct file *file, void *fh,
         struct v4l2_fmtdesc *f)
@@ -750,7 +786,43 @@ static int nxp_video_get_format(struct file *file, void *fh,
         struct v4l2_format *f)
 {
     /* TODO */
-    pr_debug("%s\n", __func__);
+#if 0
+    struct nxp_video *me = file->private_data;
+    struct nxp_video_frame *frame;
+    struct v4l2_subdev *subdev;
+    u32 pad;
+    int ret;
+    int i;
+
+    if (me->vbq && (f->type != me->vbq->type))
+    {
+        printk("%s: type is different(%d/%d)\n", __func__, f->type, me->vbq->type);
+        return -EINVAL;
+    }
+
+    if (f->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+        frame = &me->frame[0];
+    } else if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
+        frame = &me->frame[1];
+    } else {
+        pr_err("%s: invalid type(0x%x)\n", __func__, f->type);
+        return -EINVAL;
+    }
+
+    subdev = _get_remote_subdev(me, f->type, &pad);
+    if (!subdev) {
+        printk("%s: can't get remote source subdev\n", __func__);
+        return -EINVAL;
+    }
+
+    f = &frame->format; 
+    ret = v4l2_subdev_call(subdev, pad, get_fmt, fh, f);
+    if (ret < 0) {
+        printk("%s: failed to subdev set_fmt()\n", __func__);
+        return ret;
+    }
+#endif
+    printk("%s\n", __func__);
     return 0;
 }
 
@@ -767,16 +839,20 @@ static int nxp_video_set_format(struct file *file, void *fh,
     int ret;
     int i;
 
+    printk("## func: %s, line: %d\n", __func__, __LINE__);
+
     if (me->vbq && (f->type != me->vbq->type)) {
+        printk("%s: type is different(%d/%d)\n", __func__, f->type, me->vbq->type);
         pr_err("%s: type is different(%d/%d)\n", __func__, f->type, me->vbq->type);
         return -EINVAL;
     }
 
-    if (f->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
+    if (f->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
         frame = &me->frame[0];
     } else if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
         frame = &me->frame[1];
     } else {
+        printk("%s: invalid type(0x%x)\n", __func__, f->type);
         pr_err("%s: invalid type(0x%x)\n", __func__, f->type);
         return -EINVAL;
     }
@@ -785,6 +861,7 @@ static int nxp_video_set_format(struct file *file, void *fh,
     format = _find_format(pix->pixelformat, 0);
     if (!format) {
         pr_err("%s: unsupported format!!!\n", __func__);
+        printk("%s: unsupported format!!!\n", __func__);
         return -EINVAL;
     }
 
@@ -792,6 +869,7 @@ static int nxp_video_set_format(struct file *file, void *fh,
 
     subdev = _get_remote_subdev(me, f->type, &pad);
     if (!subdev) {
+        printk("%s: can't get remote source subdev\n", __func__);
         pr_err("%s: can't get remote source subdev\n", __func__);
         return -EINVAL;
     }
@@ -808,6 +886,7 @@ static int nxp_video_set_format(struct file *file, void *fh,
     /* call to subdev */
     ret = v4l2_subdev_call(subdev, pad, set_fmt, NULL, &mbus_fmt);
     if (ret < 0) {
+        printk("%s: failed to subdev set_fmt()\n", __func__);
         pr_err("%s: failed to subdev set_fmt()\n", __func__);
         return ret;
     }
@@ -822,11 +901,14 @@ static int nxp_video_set_format(struct file *file, void *fh,
     frame->height = pix->height;
 
     for (i = 0; i < format->num_planes; ++i) {
+        pix->plane_fmt[i].bytesperline = 1280;
+        pix->plane_fmt[i].sizeimage = 614400;
         frame->stride[i] = pix->plane_fmt[i].bytesperline;
         frame->size[i] = pix->plane_fmt[i].sizeimage;
     }
 
     pr_debug("%s: %s success!!!\n", __func__, me->name);
+    printk("%s: %s success!!!\n", __func__, me->name);
     return 0;
 }
 
@@ -843,9 +925,14 @@ static int nxp_video_reqbufs(struct file *file, void *fh,
 {
     struct nxp_video *me = file->private_data;
     pr_debug("%s: %s\n", __func__, me->name);
-    if (me->vbq) { /* capture, out */
+    printk("%s: %s\n", __func__, me->name);
+
+    if (me->vbq)
+    { /* capture, out */
         return vb2_reqbufs(me->vbq, b); /* call to queue_setup */
-    } else { /* m2m */
+    }
+    else
+    { /* m2m */
         struct vb2_queue *vq = v4l2_m2m_get_vq(me->m2m_ctx, b->type);
         return vb2_reqbufs(vq, b);
     }
@@ -898,11 +985,13 @@ static int nxp_video_streamon(struct file *file, void *fh,
     struct v4l2_subdev *subdev = _get_remote_subdev(me, i, &pad);
     void *hostdata_back;
 
-     vmsg("%s: me %p, %s\n", __func__, me, me->name);
+    vmsg("%s: me %p, %s\n", __func__, me, me->name);
+    printk("## %s: me %p, %s\n", __func__, me, me->name);
 
     if (me->vbq) {
         ret = vb2_streamon(me->vbq, i);
         if (ret < 0) {
+            printk("%s: failed to vb2_streamon()\n", __func__);
             pr_err("%s: failed to vb2_streamon()\n", __func__);
             return ret;
         }
@@ -910,6 +999,7 @@ static int nxp_video_streamon(struct file *file, void *fh,
         struct vb2_queue *vq = v4l2_m2m_get_vq(me->m2m_ctx, i);
         ret = vb2_streamon(vq, i);
         if (ret < 0) {
+            printk("%s: m2m, failed to vb2_streamon()\n", __func__);
             pr_err("%s: m2m, failed to vb2_streamon()\n", __func__);
             return ret;
         }
@@ -1113,7 +1203,7 @@ static int nxp_video_s_ctrl(struct file *file, void *fh,
 
     me = file->private_data;
     type = (me->type == NXP_VIDEO_TYPE_CAPTURE) ?
-        V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE : V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
+        V4L2_BUF_TYPE_VIDEO_CAPTURE : V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
     subdev = _get_remote_subdev(me, type, &pad);
 
     ret = v4l2_subdev_call(subdev, core, s_ctrl, ctrl);
@@ -1122,10 +1212,37 @@ static int nxp_video_s_ctrl(struct file *file, void *fh,
     return ret;
 }
 
+static int nxp_video_g_chip_ident(struct file *file, void *fh,
+        struct v4l2_dbg_chip_ident *chip)
+{
+    int ret;
+    u32 pad;
+    u32 type;
+    struct nxp_video *me;
+    struct v4l2_subdev *subdev;
+
+    pr_debug("%s\n", __func__);
+    printk("## %s\n", __func__);
+
+    me = file->private_data;
+    type = (me->type == NXP_VIDEO_TYPE_CAPTURE) ?
+        V4L2_BUF_TYPE_VIDEO_CAPTURE : V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
+    
+    subdev = _get_remote_subdev(me, type, &pad);
+
+    ret = v4l2_subdev_call(subdev, core, g_chip_ident, chip);
+    if (ret < 0)
+        printk("## %s: failed to subdev g_chip_ident.\n", __func__);
+    return ret;
+}
+
+
 static struct v4l2_ioctl_ops nxp_video_ioctl_ops = {
     .vidioc_querycap                = nxp_video_querycap,
     .vidioc_enum_fmt_vid_cap_mplane = nxp_video_enum_format,
     .vidioc_enum_fmt_vid_out_mplane = nxp_video_enum_format,
+    .vidioc_g_fmt_vid_cap           = nxp_video_get_format,
+    .vidioc_s_fmt_vid_cap           = nxp_video_set_format,
     .vidioc_g_fmt_vid_cap_mplane    = nxp_video_get_format,
     .vidioc_g_fmt_vid_out_mplane    = nxp_video_get_format,
     .vidioc_s_fmt_vid_cap_mplane    = nxp_video_set_format,
@@ -1147,6 +1264,7 @@ static struct v4l2_ioctl_ops nxp_video_ioctl_ops = {
     .vidioc_g_crop                  = nxp_video_get_crop,
     .vidioc_s_crop                  = nxp_video_set_crop,
     .vidioc_s_ctrl                  = nxp_video_s_ctrl,
+    .vidioc_g_chip_ident            = nxp_video_g_chip_ident,
 };
 
 /*
@@ -1160,14 +1278,16 @@ static int nxp_video_open(struct file *file)
     int ret = 0;
 
     pr_debug("%s entered : %s\n", __func__, me->name);
+    printk("## %s entered : %s\n", __func__, me->name);
 
     if (me->open_count == 0) {
         memset(me->frame, 0, sizeof(struct nxp_video_frame)*2);
 
         sd = _get_remote_subdev(me,
                 me->type == NXP_VIDEO_TYPE_OUT ?
-                V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE : V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE,
+                V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE : V4L2_BUF_TYPE_VIDEO_CAPTURE,
                 &pad);
+    
 
         if (sd)
             ret = v4l2_subdev_call(sd, core, s_power, 1);
@@ -1176,9 +1296,18 @@ static int nxp_video_open(struct file *file)
             me->m2m_ctx = v4l2_m2m_ctx_init(me->m2m_dev, me, m2m_queue_init);
             if (IS_ERR(me->m2m_ctx)) {
                 pr_err("%s: failed to v4l2_m2m_ctx_init()\n", __func__);
+                printk("### %s: failed to v4l2_m2m_ctx_init()\n", __func__);
                 return -EINVAL;
             }
         }
+
+        // set format
+
+        // init videobuf
+
+        // setup control handler
+        //v4l2_ctrl_handler_setup(&me->vdev->ctrl_handler);
+
     }
     me->open_count++;
     file->private_data = me;
@@ -1199,7 +1328,7 @@ static int nxp_video_release(struct file *file)
     if (me->open_count == 0) {
         sd = _get_remote_subdev(me,
                 me->type == NXP_VIDEO_TYPE_OUT ?
-                V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE : V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE,
+                V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE : V4L2_BUF_TYPE_VIDEO_CAPTURE,
                 &pad);
         if (sd) {
             ret = v4l2_subdev_call(sd, core, s_power, 0);
@@ -1350,6 +1479,7 @@ struct nxp_video *create_nxp_video(char *name, u32 type,
     int ret;
     struct vb2_queue *vbq = NULL;
     struct nxp_video *me = kzalloc(sizeof(struct nxp_video), GFP_KERNEL);
+
     int pad_num = 0;
 
     if (!me) {
@@ -1364,48 +1494,9 @@ struct nxp_video *create_nxp_video(char *name, u32 type,
     me->v4l2_dev      = v4l2_dev;
     me->vb2_alloc_ctx = vb2_alloc_ctx;
 
-    /* pad init */
-    /* TODO */
-#if 0
-    switch (type) {
-    case NXP_VIDEO_TYPE_CAPTURE:
-        /**
-         * capture subdev -> capture ->
-         * m2m subdev or out subdev
-         */
-        me->pads[0].flags = MEDIA_PAD_FL_SINK;
-        me->pads[1].flags = MEDIA_PAD_FL_SOURCE;
-        pad_num = 2;
-        break;
-
-    case NXP_VIDEO_TYPE_OUT:
-        /**
-         * out -> out subdev
-         */
-        me->pads[0].flags = MEDIA_PAD_FL_SOURCE;
-        pad_num = 1;
-        break;
-
-    case NXP_VIDEO_TYPE_M2M:
-        /**
-         * capture video -> m2m subdev ->
-         * m2m video -> out subdev
-         */
-        me->pads[0].flags = MEDIA_PAD_FL_SINK;
-        me->pads[1].flags = MEDIA_PAD_FL_SOURCE;
-        pad_num = 2;
-        break;
-
-    default:
-        pr_err("%s: invalid type(%d)\n", __func__, type);
-        kfree(me);
-        return NULL;
-    }
-#else
     me->pads[0].flags = MEDIA_PAD_FL_SINK;
     me->pads[1].flags = MEDIA_PAD_FL_SOURCE;
     pad_num = 2;
-#endif
 
     me->vdev.entity.ops = &nxp_media_entity_operations;
     ret = media_entity_init(&me->vdev.entity, pad_num, me->pads, 0);
@@ -1415,6 +1506,7 @@ struct nxp_video *create_nxp_video(char *name, u32 type,
     }
 
     mutex_init(&me->lock);
+
 
     me->register_buffer_consumer = _register_buffer_consumer;
     me->unregister_buffer_consumer = _unregister_buffer_consumer;
@@ -1427,30 +1519,41 @@ struct nxp_video *create_nxp_video(char *name, u32 type,
     me->vdev.release   = video_device_release;
     me->vdev.lock      = &me->lock;
 
-    if (type != NXP_VIDEO_TYPE_M2M) {
+    if (type != NXP_VIDEO_TYPE_M2M)
+    {
         vbq = kzalloc(sizeof(*vbq), GFP_KERNEL);
-        if (!vbq) {
+        if (!vbq)
+        {
             pr_err("%s: failed to allocate vbq\n", __func__);
+            printk("%s: failed to allocate vbq\n", __func__);
             ret = -ENOMEM;
             goto error_vbq_alloc;
         }
+
         vbq->type     = type == NXP_VIDEO_TYPE_CAPTURE ?
-            V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE : V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
+            V4L2_BUF_TYPE_VIDEO_CAPTURE : V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
         vbq->io_modes = VB2_MMAP | VB2_USERPTR | VB2_DMABUF;
         vbq->drv_priv = me;
         vbq->ops      = &nxp_vb2_ops;
         vbq->mem_ops  = &vb2_ion_memops;
+
         ret = vb2_queue_init(vbq);
-        if (ret < 0) {
+        if (ret < 0)
+        {
             pr_err("%s: failed to vb2_queue_init()\n", __func__);
+            printk("## %s: failed to vb2_queue_init()\n", __func__);
             goto error_vbq_init;
         }
         me->vbq = vbq;
-    } else {
+    }
+    else
+    {
         /* m2m */
         me->m2m_dev = v4l2_m2m_init(&nxp_m2m_ops);
-        if (IS_ERR(me->m2m_dev)) {
+        if (IS_ERR(me->m2m_dev))
+        {
             pr_err("%s: failed to v4l2_m2m_init()\n", __func__);
+            printk("## %s: failed to v4l2_m2m_init()\n", __func__);
             ret = -ENOMEM;
             goto error_vbq_alloc;
         }
@@ -1463,6 +1566,7 @@ struct nxp_video *create_nxp_video(char *name, u32 type,
     video_set_drvdata(&me->vdev, me);
 
     pr_debug("%s: success!!!\n", __func__);
+    printk("## %s: success!!!\n", __func__);
     return me;
 
 error_vbq_init:

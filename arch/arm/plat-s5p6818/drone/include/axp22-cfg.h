@@ -49,11 +49,11 @@
 #define AXP_ALDO2_NAME						"valive_1.8V"		/* VCC1P8_ALIVE		*/
 #define AXP_ALDO3_NAME						"valive_1.0V"		/* VCC1P0_ALIVE		*/
 #define AXP_DLDO1_NAME						"vwide_3.3V"		/* VCC_WIDE			*/
-#define AXP_DLDO2_NAME						"vcam1_1.8V"		/* VCC1P8_CAM			*/
+#define AXP_DLDO2_NAME						"vcam1_1.5V"		/* VCC1P5_CAM			*/
 #define AXP_DLDO3_NAME						"vdumy1_0.7V"		/* NC					*/
 #define AXP_DLDO4_NAME						"vdumy2_0.7V"		/* NC					*/
 #define AXP_ELDO1_NAME						"vsys1_1.8V"		/* VCC1P8_SYS			*/
-#define AXP_ELDO2_NAME						"vwifi_3.3V"		/* VCC3P3_WIFI			*/
+#define AXP_ELDO2_NAME						"vcam1_2.8V"		/* VCC2P8_CAM			*/
 #define AXP_ELDO3_NAME						"vdumy3_0.7V"		/* NC					*/
 #define AXP_DC5LDO_NAME						"vcvbs_1.2V"		/* VCC1P2_CVBS		*/
 
@@ -67,11 +67,11 @@
 #define AXP_ALDO2_VALUE						1800000		/* VCC1P8_ALIVE		ALDO2	 : 	AXP22:  700~3300, 100/step*/
 #define AXP_ALDO3_VALUE						1000000		/* VCC1P0_ALIVE		ALDO3	 : 	AXP22:  700~3300, 100/step*/
 #define AXP_DLDO1_VALUE						3300000		/* VCC_WIDE			DLDO1	 : 	AXP22:  700~3300, 100/step*/
-#define AXP_DLDO2_VALUE						1800000		/* VCC1P8_CAM			DLDO2	 : 	AXP22 : 700~3300, 100/step*/
+#define AXP_DLDO2_VALUE						1500000		/* VCC1P5_CAM			DLDO2	 : 	AXP22 : 700~3300, 100/step*/
 #define AXP_DLDO3_VALUE						 700000		/* NC					DLDO3	 : 	AXP22:  700~3300, 100/step*/
 #define AXP_DLDO4_VALUE						 700000		/* NC					DLDO4	 : 	AXP22:  700~3300, 100/step*/
 #define AXP_ELDO1_VALUE						1800000		/* VCC1P8_SYS			ELDO1	 : 	AXP22:  700~3300, 100/step*/
-#define AXP_ELDO2_VALUE						3300000		/* VCC3P3_WIFI			ELDO2	 : 	AXP22:  700~3300, 100/step*/
+#define AXP_ELDO2_VALUE						2800000		/* VCC2P8_CAM			ELDO2	 : 	AXP22:  700~3300, 100/step*/
 #define AXP_ELDO3_VALUE						 700000		/* NC					ELDO3	 : 	AXP22:  700~3300, 100/step*/
 #define AXP_DC5LDO_VALUE					1200000		/* VCC1P2_CVBS		DC5LDO	 : 	AXP22:  700~1400, 100/step*/
 
@@ -85,11 +85,11 @@
 #define AXP_ALDO2_ENABLE					1		/* VCC1P8_ALIVE		ALDO2	 : 	AXP22:  700~3300, 100/step*/
 #define AXP_ALDO3_ENABLE					1		/* VCC1P0_ALIVE		ALDO3	 : 	AXP22:  700~3300, 100/step*/
 #define AXP_DLDO1_ENABLE					1		/* VCC_WIDE			DLDO1	 : 	AXP22:  700~3300, 100/step*/
-#define AXP_DLDO2_ENABLE					0		/* VCC1P8_CAM			DLDO2	 : 	AXP22 : 700~3300, 100/step*/
+#define AXP_DLDO2_ENABLE					0		/* VCC1P5_CAM			DLDO2	 : 	AXP22 : 700~3300, 100/step*/
 #define AXP_DLDO3_ENABLE					0		/* NC					DLDO3	 : 	AXP22:  700~3300, 100/step*/
 #define AXP_DLDO4_ENABLE					0		/* NC					DLDO4	 : 	AXP22:  700~3300, 100/step*/
 #define AXP_ELDO1_ENABLE					1		/* VCC1P8_SYS			ELDO1	 : 	AXP22:  700~3300, 100/step*/
-#define AXP_ELDO2_ENABLE					1		/* VCC3P3_WIFI			ELDO2	 : 	AXP22:  700~3300, 100/step*/
+#define AXP_ELDO2_ENABLE					0		/* VCC2P8_CAM			ELDO2	 : 	AXP22:  700~3300, 100/step*/
 #define AXP_ELDO3_ENABLE					0		/* NC					ELDO3	 : 	AXP22:  700~3300, 100/step*/
 #define AXP_DC5LDO_ENABLE					0		/* VCC1P2_CVBS		DC5LDO	 : 	AXP22:  700~1400, 100/step*/
 #define AXP_DC1SW_ENABLE					0		/* NC					DC1SW	 : 	AXP22: */

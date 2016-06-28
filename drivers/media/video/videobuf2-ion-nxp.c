@@ -117,9 +117,11 @@ void *vb2_ion_private_alloc(void *alloc_ctx, size_t size)
     int flags = ion_heapflag(ctx->flags);
     int ret = 0;
 
+    printk("## %s", __func__);
     buf = kzalloc(sizeof(*buf), GFP_KERNEL);
     if (!buf) {
         pr_err("%s error: fail to kzalloc size(%d)\n", __func__, sizeof(*buf));
+        printk("## %s error: fail to kzalloc size(%d)\n", __func__, sizeof(*buf));
         return ERR_PTR(-ENOMEM);
     }
 
@@ -150,7 +152,8 @@ err_map_kernel:
 err_alloc:
     kfree(buf);
 
-    pr_err("%s: Error occured while allocating\n", __func__);
+    //pr_err("%s: Error occured while allocating\n", __func__);
+    printk("## %s: Error occured while allocating, size = %d, alignment = %ld, flags = %d.\n", __func__, size, ctx->alignment, flags);
     return ERR_PTR(ret);
 }
 
